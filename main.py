@@ -85,13 +85,13 @@ class VideoAnalysisGUI:
         video_path = filedialog.askopenfilename(filetypes=[("Video files", "*.mp4;*.avi;*.mov")])
         if video_path:
             self.selected_videos.append(video_path)
-            messagebox.showinfo("Selected Video", f"Selected: {video_path}")
+            # messagebox.showinfo("Selected Video", f"Selected: {video_path}")
     
     def select_target_path(self):
         target_path = filedialog.askdirectory()
         if target_path:
             self.target_path = target_path
-            messagebox.showinfo("Selected Target Path", f"Selected: {target_path}")
+            # messagebox.showinfo("Selected Target Path", f"Selected: {target_path}")
     
     def select_image_from_video(self):
         if not self.selected_videos:
@@ -294,7 +294,7 @@ class VideoAnalysisGUI:
     def add_to_queue(self):
         if self.selected_videos and hasattr(self, 'target_path'):
             self.queue.append((self.selected_videos.pop(0), self.target_path))
-            messagebox.showinfo("Queue", "Video added to queue.")
+            # messagebox.showinfo("Queue", "Video added to queue.")
         else:
             messagebox.showwarning("Warning", "Please select a video and a target path first.")
     
