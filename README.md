@@ -28,14 +28,15 @@ The Video Analysis Tool is a graphical user interface (GUI) application built us
 
 3. **Install the required packages**:
     ```bash
-    pip install -r requirements.txt
+    pip install tkinter
+    pip install cv2
     ```
 
 ## Usage
 
 1. **Run the application**:
     ```bash
-    python gui.py
+    python main.py
     ```
 
 2. **Follow the steps below to use the tool**:
