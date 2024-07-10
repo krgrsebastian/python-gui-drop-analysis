@@ -49,6 +49,7 @@ class VideoAnalysisGUI:
         self.rotate_label.grid(row=3, column=0, padx=10, pady=10)
         self.rotate_entry = ttk.Entry(self.root)
         self.rotate_entry.grid(row=3, column=1, padx=10, pady=10)
+        self.rotate_entry.bind("<Return>", self.rotate_cropped_image)
         
         # Baseline selection
         self.baseline_label = ttk.Label(self.root, text="Select Baseline:")
@@ -184,7 +185,7 @@ class VideoAnalysisGUI:
         self.video_window.destroy()
         frame_rgb = cv2.cvtColor(self.current_frame, cv2.COLOR_BGR2RGB)
         self.show_frame_for_cropping(frame_rgb)
-    
+
     def show_frame_for_cropping(self, frame):
         self.original_image = Image.fromarray(frame)
         self.rotated_image = self.original_image
@@ -194,8 +195,8 @@ class VideoAnalysisGUI:
         self.canvas_crop = tk.Canvas(self.crop_window, width=self.rotated_image.width, height=self.rotated_image.height)
         self.canvas_crop.pack()
         
-        self.rotate_label = ttk.Label(self.crop_window, text="Rotate Image (degrees):")
-        self.rotate_label.pack(pady=5)
+        self.rotate_label_crop = ttk.Label(self.crop_window, text="Rotate Image (degrees):")
+        self.rotate_label_crop.pack(pady=5)
         
         self.rotate_entry_crop = ttk.Entry(self.crop_window)
         self.rotate_entry_crop.pack(pady=5)
@@ -211,9 +212,8 @@ class VideoAnalysisGUI:
         self.crop_start_x = None
         self.crop_start_y = None
         
-        self.save_button_in_crop = ttk.Button(self.crop_window, text="Save and Continue", command=self.save_cropped_image)
+        self.save_button_in_crop = ttk.Button(self.crop_window, text="Save and Continue", command=self.preview_cropped_image)
         self.save_button_in_crop.pack()
-
 
     def rotate_image_entry_crop(self, event):
         if hasattr(self, 'original_image'):
@@ -247,9 +247,6 @@ class VideoAnalysisGUI:
         self.canvas_crop.create_image(0, 0, anchor=tk.NW, image=self.tk_image)
         self.canvas_crop.image = self.tk_image  # To prevent garbage collection
 
-
-
-
     def start_crop(self, event):
         self.crop_start_x = event.x
         self.crop_start_y = event.y
@@ -270,19 +267,41 @@ class VideoAnalysisGUI:
         orig_crop_end_x = int(self.crop_end_x / self.scale_factor)
         orig_crop_end_y = int(self.crop_end_y / self.scale_factor)
         
-        self.cropped_image = self.rotated_image.crop((orig_crop_start_x, orig_crop_start_y, orig_crop_end_x, orig_crop_end_y))
         self.crop_coords = (orig_crop_start_x, orig_crop_start_y, orig_crop_end_x, orig_crop_end_y)
-        self.show_cropped_image()
+        self.cropped_image = self.original_image.crop(self.crop_coords)
         self.update_parameters()
 
-
-    def show_cropped_image(self):
+    def preview_cropped_image(self):
         self.tk_cropped_image = ImageTk.PhotoImage(self.cropped_image)
+        self.cropped_image_window = tk.Toplevel(self.root)
+        self.cropped_image_window.title("Cropped Image Preview")
+        
+        self.cropped_image_canvas = tk.Canvas(self.cropped_image_window, width=self.tk_cropped_image.width(), height=self.tk_cropped_image.height())
+        self.cropped_image_canvas.pack()
+        
+        self.cropped_image_canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_cropped_image)
+        self.cropped_image_canvas.image = self.tk_cropped_image  # To prevent garbage collection
+        
+        # Add buttons to confirm or readjust the cropping
+        self.confirm_button = ttk.Button(self.cropped_image_window, text="Confirm", command=self.confirm_cropping)
+        self.confirm_button.pack(side=tk.LEFT, padx=10, pady=10)
+        
+        self.readjust_button = ttk.Button(self.cropped_image_window, text="Readjust", command=self.readjust_cropping)
+        self.readjust_button.pack(side=tk.RIGHT, padx=10, pady=10)
+
+    def confirm_cropping(self):
+        self.cropped_image_window.destroy()
+        self.crop_window.destroy()
         self.open_image_window()
+        self.rotate_entry.delete(0, tk.END)
+        self.rotate_entry.insert(0, str(self.rotation_angle))
+
+    def readjust_cropping(self):
+        self.cropped_image_window.destroy()
     
     def open_image_window(self):
         self.image_window = tk.Toplevel(self.root)
-        self.image_window.title("Image Window")
+        self.image_window.title("Cropped Image for Baseline Selection")
         
         self.canvas = tk.Canvas(self.image_window, width=self.tk_cropped_image.width(), height=self.tk_cropped_image.height())
         self.canvas.pack()
@@ -293,6 +312,24 @@ class VideoAnalysisGUI:
         
         self.baseline_slider.config(to=self.tk_cropped_image.height())
     
+    def rotate_cropped_image(self, event):
+        if hasattr(self, 'original_image') and hasattr(self, 'crop_coords'):
+            try:
+                new_angle = int(self.rotate_entry.get())
+                self.rotation_angle = new_angle
+                # Rotate the original image first
+                rotated_image = self.original_image.rotate(self.rotation_angle, expand=True)
+                # Crop the rotated image
+                cropped_image = rotated_image.crop(self.crop_coords)
+                self.cropped_image = cropped_image
+                self.tk_cropped_image = ImageTk.PhotoImage(self.cropped_image)
+                self.update_image_window()
+                self.update_parameters()
+            except ValueError:
+                messagebox.showwarning("Warning", "Please enter a valid integer.")
+        else:
+            messagebox.showwarning("Warning", "Please crop an image first.")
+
     def update_image_window(self):
         if hasattr(self, 'image_window'):
             self.canvas.config(width=self.tk_cropped_image.width(), height=self.tk_cropped_image.height())
@@ -301,12 +338,7 @@ class VideoAnalysisGUI:
             self.canvas.image = self.tk_cropped_image  # To prevent garbage collection
             self.canvas.create_line(0, self.baseline_y, self.tk_cropped_image.width(), self.baseline_y, fill='red', width=2)
             self.baseline_slider.config(to=self.tk_cropped_image.height())
-    
-    def save_cropped_image(self):
-        self.crop_window.destroy()
-        self.rotate_entry.delete(0, tk.END)
-        self.rotate_entry.insert(0, str(self.rotation_angle))
-    
+
     def update_parameters(self):
         selected_videos_str = ", ".join(self.selected_videos)
         params = f"Selected Videos: {selected_videos_str}, Target Path: {self.target_path}, Crop Coords: {self.crop_coords}, Rotation: {self.rotation_angle}°, Baseline: {self.baseline_y}"

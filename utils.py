@@ -1,4 +1,4 @@
-# For any utility functions you may need
+# For any utility functions 
 
 def some_utility_function():
     pass
