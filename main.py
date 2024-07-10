@@ -12,6 +12,7 @@ class VideoAnalysisGUI:
         
         self.selected_videos = []
         self.queue = []
+        self.target_path = ""
         
         self.crop_coords = None
         self.rotation_angle = 0
@@ -85,12 +86,14 @@ class VideoAnalysisGUI:
         video_path = filedialog.askopenfilename(filetypes=[("Video files", "*.mp4;*.avi;*.mov")])
         if video_path:
             self.selected_videos.append(video_path)
+            self.update_parameters()
             # messagebox.showinfo("Selected Video", f"Selected: {video_path}")
     
     def select_target_path(self):
         target_path = filedialog.askdirectory()
         if target_path:
             self.target_path = target_path
+            self.update_parameters()
             # messagebox.showinfo("Selected Target Path", f"Selected: {target_path}")
     
     def select_image_from_video(self):
@@ -282,7 +285,8 @@ class VideoAnalysisGUI:
         self.rotate_entry.insert(0, str(self.rotation_angle))
     
     def update_parameters(self):
-        params = f"Crop Coords: {self.crop_coords}, Rotation: {self.rotation_angle}°, Baseline: {self.baseline_y}"
+        selected_videos_str = ", ".join(self.selected_videos)
+        params = f"Selected Videos: {selected_videos_str}, Target Path: {self.target_path}, Crop Coords: {self.crop_coords}, Rotation: {self.rotation_angle}°, Baseline: {self.baseline_y}"
         self.param_display.config(text=params)
     
     def set_baseline(self, value):
@@ -294,6 +298,7 @@ class VideoAnalysisGUI:
     def add_to_queue(self):
         if self.selected_videos and hasattr(self, 'target_path'):
             self.queue.append((self.selected_videos.pop(0), self.target_path))
+            self.update_parameters()
             # messagebox.showinfo("Queue", "Video added to queue.")
         else:
             messagebox.showwarning("Warning", "Please select a video and a target path first.")
