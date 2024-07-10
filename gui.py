@@ -72,8 +72,9 @@ class VideoAnalysisGUI:
         self.param_label = ttk.Label(self.root, text="Parameters:")
         self.param_label.grid(row=7, column=0, padx=10, pady=10)
         
-        self.param_display = ttk.Label(self.root, text="")
+        self.param_display = tk.Text(self.root, height=10, width=60, wrap=tk.WORD)
         self.param_display.grid(row=7, column=1, padx=10, pady=10)
+        self.param_display.config(state=tk.DISABLED)
         
         # Queue and start analysis
         self.queue_button = ttk.Button(self.root, text="Add to Queue", command=self.add_to_queue)
@@ -340,10 +341,29 @@ class VideoAnalysisGUI:
             self.baseline_slider.config(to=self.tk_cropped_image.height())
 
     def update_parameters(self):
-        selected_videos_str = ", ".join(self.selected_videos)
-        params = f"Selected Videos: {selected_videos_str}, Target Path: {self.target_path}, Crop Coords: {self.crop_coords}, Rotation: {self.rotation_angle}°, Baseline: {self.baseline_y}"
-        self.param_display.config(text=params)
-    
+        self.param_display.config(state=tk.NORMAL)
+        self.param_display.delete(1.0, tk.END)
+        selected_videos_str = "\n".join(self.selected_videos)
+        params = (
+            f"Selected Videos:\n{selected_videos_str}\n\n"
+            f"Target Path:\n{self.target_path}\n\n"
+            f"Crop Coords: {self.crop_coords}\n"
+            f"Rotation: {self.rotation_angle}°\n"
+            f"Baseline: {self.baseline_y}"
+        )
+        self.param_display.insert(tk.END, params)
+        self.param_display.config(state=tk.DISABLED)
+
+    def reset_parameters(self):
+        self.selected_videos = []
+        self.target_path = ""
+        self.crop_coords = None
+        self.rotation_angle = 0
+        self.baseline_y = 0
+        self.rotate_entry.delete(0, tk.END)
+        self.baseline_slider.set(0)
+        self.update_parameters()
+
     def set_baseline(self, value):
         self.baseline_y = int(value)
         if hasattr(self, 'tk_cropped_image'):
@@ -351,9 +371,9 @@ class VideoAnalysisGUI:
         self.update_parameters()
 
     def add_to_queue(self):
-        if self.selected_videos and hasattr(self, 'target_path'):
-            self.queue.append((self.selected_videos.pop(0), self.target_path))
-            self.update_parameters()
+        if self.selected_videos and self.target_path:
+            self.queue.append((self.selected_videos.copy(), self.target_path))
+            self.reset_parameters()
         else:
             messagebox.showwarning("Warning", "Please select a video and a target path first.")
     
