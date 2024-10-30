@@ -2,7 +2,30 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from PIL import Image, ImageTk
 import cv2
-from video_processing import VideoProcessor
+# from video_processing import VideoProcessor  # Uncomment if you have this module
+
+class ScrollableFrame(ttk.Frame):
+    def __init__(self, container, *args, **kwargs):
+        super().__init__(container, *args, **kwargs)
+        self.canvas = tk.Canvas(self)
+        self.scrollbar_v = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollbar_h = ttk.Scrollbar(self, orient="horizontal", command=self.canvas.xview)
+        self.scrollable_frame = ttk.Frame(self.canvas)
+
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(
+                scrollregion=self.canvas.bbox("all")
+            )
+        )
+
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+
+        self.canvas.configure(yscrollcommand=self.scrollbar_v.set, xscrollcommand=self.scrollbar_h.set)
+
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar_v.pack(side="right", fill="y")
+        self.scrollbar_h.pack(side="bottom", fill="x")
 
 class VideoAnalysisGUI:
     def __init__(self, root):
@@ -105,34 +128,40 @@ class VideoAnalysisGUI:
         
         self.video_window = tk.Toplevel(self.root)
         self.video_window.title("Select Frame")
+        self.video_window.geometry("800x600")  # Set a default size
+        self.video_window.minsize(400, 300)  # Set minimum size
         
-        self.video_label = ttk.Label(self.video_window)
+        # Create a scrollable frame
+        scrollable_frame = ScrollableFrame(self.video_window)
+        scrollable_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.video_label = ttk.Label(scrollable_frame.scrollable_frame)
         self.video_label.pack()
-        
+
         self.pause = False
-        
-        self.timeline = tk.Scale(self.video_window, from_=0, to=int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))-1, orient=tk.HORIZONTAL, length=400, command=self.set_frame)
+
+        self.timeline = tk.Scale(scrollable_frame.scrollable_frame, from_=0, to=int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))-1, orient=tk.HORIZONTAL, length=400, command=self.set_frame)
         self.timeline.pack()
-        
-        controls_frame = ttk.Frame(self.video_window)
+
+        controls_frame = ttk.Frame(scrollable_frame.scrollable_frame)
         controls_frame.pack()
-        
+
         self.play_button = ttk.Button(controls_frame, text="Play/Pause", command=self.toggle_pause)
         self.play_button.grid(row=0, column=0, padx=5, pady=5)
-        
+
         self.prev_frame_button = ttk.Button(controls_frame, text="<<", command=self.prev_frame)
         self.prev_frame_button.grid(row=0, column=1, padx=5, pady=5)
-        
+
         self.next_frame_button = ttk.Button(controls_frame, text=">>", command=self.next_frame)
         self.next_frame_button.grid(row=0, column=2, padx=5, pady=5)
-        
+
         self.current_frame_pos = 0
         self.show_frame()
 
         self.video_window.bind("<space>", self.toggle_pause)
         self.video_window.protocol("WM_DELETE_WINDOW", self.on_video_window_close)
-        
-        self.select_frame_button = ttk.Button(self.video_window, text="Select Frame", command=self.capture_frame)
+
+        self.select_frame_button = ttk.Button(scrollable_frame.scrollable_frame, text="Select Frame", command=self.capture_frame)
         self.select_frame_button.pack()
 
     def show_frame(self):
@@ -151,6 +180,9 @@ class VideoAnalysisGUI:
     def display_frame(self, frame):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         img = Image.fromarray(frame_rgb)
+
+        # Resize the image to fit the label
+        img = img.resize((600, 400), Image.LANCZOS)
         imgtk = ImageTk.PhotoImage(image=img)
         self.video_label.imgtk = imgtk
         self.video_label.configure(image=imgtk)
@@ -182,6 +214,7 @@ class VideoAnalysisGUI:
     
     def capture_frame(self):
         self.pause = True
+        self.selected_frame_number = self.current_frame_pos  # Store the frame number
         self.cap.release()
         self.video_window.destroy()
         frame_rgb = cv2.cvtColor(self.current_frame, cv2.COLOR_BGR2RGB)
@@ -192,28 +225,34 @@ class VideoAnalysisGUI:
         self.rotated_image = self.original_image
         self.crop_window = tk.Toplevel(self.root)
         self.crop_window.title("Crop Image")
+        self.crop_window.geometry("800x600")
+        self.crop_window.minsize(400, 300)
         
-        self.canvas_crop = tk.Canvas(self.crop_window, width=self.rotated_image.width, height=self.rotated_image.height)
+        # Create a scrollable frame
+        scrollable_frame = ScrollableFrame(self.crop_window)
+        scrollable_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.canvas_crop = tk.Canvas(scrollable_frame.scrollable_frame, width=self.rotated_image.width, height=self.rotated_image.height)
         self.canvas_crop.pack()
-        
-        self.rotate_label_crop = ttk.Label(self.crop_window, text="Rotate Image (degrees):")
+
+        self.rotate_label_crop = ttk.Label(scrollable_frame.scrollable_frame, text="Rotate Image (degrees):")
         self.rotate_label_crop.pack(pady=5)
-        
-        self.rotate_entry_crop = ttk.Entry(self.crop_window)
+
+        self.rotate_entry_crop = ttk.Entry(scrollable_frame.scrollable_frame)
         self.rotate_entry_crop.pack(pady=5)
         self.rotate_entry_crop.bind("<Return>", self.rotate_image_entry_crop)
-        
+
         self.show_rotated_image()
 
         self.canvas_crop.bind("<Button-1>", self.start_crop)
         self.canvas_crop.bind("<B1-Motion>", self.do_crop)
         self.canvas_crop.bind("<ButtonRelease-1>", self.end_crop)
-        
+
         self.crop_rectangle = None
         self.crop_start_x = None
         self.crop_start_y = None
-        
-        self.save_button_in_crop = ttk.Button(self.crop_window, text="Save and Continue", command=self.preview_cropped_image)
+
+        self.save_button_in_crop = ttk.Button(scrollable_frame.scrollable_frame, text="Save and Continue", command=self.preview_cropped_image)
         self.save_button_in_crop.pack()
 
     def rotate_image_entry_crop(self, event):
@@ -261,15 +300,21 @@ class VideoAnalysisGUI:
     def end_crop(self, event):
         self.crop_end_x = event.x
         self.crop_end_y = event.y
-        
-        # Convert the coordinates from the displayed (scaled) image to the original image
+
+        # Convert the coordinates from the displayed (scaled) image to the rotated image
         orig_crop_start_x = int(self.crop_start_x / self.scale_factor)
         orig_crop_start_y = int(self.crop_start_y / self.scale_factor)
         orig_crop_end_x = int(self.crop_end_x / self.scale_factor)
         orig_crop_end_y = int(self.crop_end_y / self.scale_factor)
-        
-        self.crop_coords = (orig_crop_start_x, orig_crop_start_y, orig_crop_end_x, orig_crop_end_y)
-        self.cropped_image = self.original_image.crop(self.crop_coords)
+
+        # Ensure that x1, y1 are the top-left coordinates and x2, y2 are the bottom-right
+        x1 = min(orig_crop_start_x, orig_crop_end_x)
+        y1 = min(orig_crop_start_y, orig_crop_end_y)
+        x2 = max(orig_crop_start_x, orig_crop_end_x)
+        y2 = max(orig_crop_start_y, orig_crop_end_y)
+
+        self.crop_coords = (x1, y1, x2, y2)
+        self.cropped_image = self.rotated_image.crop(self.crop_coords)
         self.update_parameters()
 
     def preview_cropped_image(self):
@@ -303,8 +348,14 @@ class VideoAnalysisGUI:
     def open_image_window(self):
         self.image_window = tk.Toplevel(self.root)
         self.image_window.title("Cropped Image for Baseline Selection")
+        self.image_window.geometry("800x600")
+        self.image_window.minsize(400, 300)
         
-        self.canvas = tk.Canvas(self.image_window, width=self.tk_cropped_image.width(), height=self.tk_cropped_image.height())
+        # Create a scrollable frame
+        scrollable_frame = ScrollableFrame(self.image_window)
+        scrollable_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.canvas = tk.Canvas(scrollable_frame.scrollable_frame, width=self.tk_cropped_image.width(), height=self.tk_cropped_image.height())
         self.canvas.pack()
         
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self.tk_cropped_image)
@@ -312,7 +363,7 @@ class VideoAnalysisGUI:
         self.canvas.create_line(0, self.baseline_y, self.tk_cropped_image.width(), self.baseline_y, fill='red', width=2)
         
         self.baseline_slider.config(to=self.tk_cropped_image.height())
-    
+
     def rotate_cropped_image(self, event):
         if hasattr(self, 'original_image') and hasattr(self, 'crop_coords'):
             try:
@@ -344,10 +395,23 @@ class VideoAnalysisGUI:
         self.param_display.config(state=tk.NORMAL)
         self.param_display.delete(1.0, tk.END)
         selected_videos_str = "\n".join(self.selected_videos)
+        crop_x1, crop_y1, crop_x2, crop_y2 = self.crop_coords if self.crop_coords else (None, None, None, None)
+        if None not in (crop_x1, crop_y1, crop_x2, crop_y2):
+            crop_x = crop_x1
+            crop_y = crop_y1
+            crop_width = crop_x2 - crop_x1
+            crop_height = crop_y2 - crop_y1
+            crop_coords_str = (f"Crop Coords:\n"
+                               f" - x1: {crop_x1}, y1: {crop_y1}, x2: {crop_x2}, y2: {crop_y2}\n"
+                               f" - x: {crop_x}, y: {crop_y}, width: {crop_width}, height: {crop_height}")
+        else:
+            crop_coords_str = "Crop Coords: None"
+
         params = (
             f"Selected Videos:\n{selected_videos_str}\n\n"
+            f"Selected Frame Number: {getattr(self, 'selected_frame_number', 'Not Selected')}\n\n"
             f"Target Path:\n{self.target_path}\n\n"
-            f"Crop Coords: {self.crop_coords}\n"
+            f"{crop_coords_str}\n\n"
             f"Rotation: {self.rotation_angle}°\n"
             f"Baseline: {self.baseline_y}"
         )
@@ -380,7 +444,12 @@ class VideoAnalysisGUI:
     def start_analysis(self):
         if self.queue:
             for video, target in self.queue:
-                VideoProcessor.analyze_video(video, target)
+                pass  # VideoProcessor.analyze_video(video, target)  # Uncomment when you have this function
             messagebox.showinfo("Analysis", "Analysis completed.")
         else:
             messagebox.showwarning("Warning", "Queue is empty.")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = VideoAnalysisGUI(root)
+    root.mainloop()
